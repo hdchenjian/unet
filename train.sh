@@ -1,5 +1,4 @@
 #!/bin/sh
-cd /home/to/unet/
-pwd
-export PYTHONPATH=/path/to/unet:$PYTHONPATH
-/home/to/caffe train --solver=solver.prototxt
+
+export LD_LIBRARY_PATH=/opt/ego/caffe-rcnn-face-ssd/lib/:/opt/ego/boost_1_61/lib/:/opt/ego/opencv_3_3/lib/
+/opt/ego/caffe-rcnn-face-ssd/bin/caffe train --solver=solver.prototxt

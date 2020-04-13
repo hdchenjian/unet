@@ -808,3 +808,9 @@ layer {
     }
   }
 }
+layer{
+  name:"sigmoid1"
+  type:"Sigmoid"
+  bottom:"score"
+  top:"score_end"
+}

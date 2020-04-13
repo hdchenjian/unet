@@ -7,9 +7,9 @@ class DataLayer(caffe.Layer):
 
     def setup(self, bottom, top):
 
-        self.imgdir = "/home/wangbin/caffeproject/unet/data/Img/"
-        self.maskdir = "/home/wangbin/caffeproject/unet/data/mask/"
-        self.imgtxt = "/home/wangbin/caffeproject/unet/data/test/img.txt"
+        self.imgdir = "../tf/tf_unet/data/muyuan/train/"
+        self.maskdir = "../tf/tf_unet/data/muyuan/train/"
+        self.imgtxt = "../tf/tf_unet/data/muyuan/train.txt"
         self.random = True
         self.seed = None
 
@@ -19,7 +19,10 @@ class DataLayer(caffe.Layer):
         if len(bottom) != 0:
             raise Exception("Do not define a bottom.")
 
-        self.lines = open(self.imgtxt, 'r').readlines()
+        self.lines = []
+        for _line in open(self.imgtxt, 'r').readlines():
+            _line = _line.strip('\n')
+            self.lines.append(_line)
         self.idx = 0
 
         if self.random:
@@ -31,6 +34,9 @@ class DataLayer(caffe.Layer):
         self.data = self.load_image(self.idx)
         self.mask = self.load_mask(self.idx)
         # reshape tops to fit (leading 1 is for batch dimension)
+        #print('input shape', self.data.shape, self.mask.shape)
+        #top[0].reshape(1, 3, 480, 640)
+        #top[1].reshape(1, 1, 480, 640)
         top[0].reshape(1, *self.data.shape)
         top[1].reshape(1, *self.mask.shape)
 
@@ -51,31 +57,29 @@ class DataLayer(caffe.Layer):
         pass
 
     def load_image(self, idx):
-
         imname = self.imgdir + self.lines[idx]
-        imname = imname[:-2]
-        #print 'load img %s' %imname
+        #print('load img', imname)
         im = cv2.imread(imname)
+        #print('im', im.shape)
         #im = cv2.imread(imname)
-        #print im.shape
-        im = cv2.resize(im,(572,572))
-        im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-        im = np.array(im, np.float64)
+        im = cv2.resize(im,(640, 480))
+        #im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+        im = np.rollaxis(im, 2, 0)
+        im = np.array(im, np.float32)
         im /= 255.0
         im -= 0.5
-        return im[np.newaxis, :]
+        #ret = im[np.newaxis, :]
+        #print('load_image', im.shape)
+        return im
 
     def load_mask(self, idx):
-	outimg = np.empty((2,572,572))
-        imname = self.maskdir + self.lines[idx]
-        imname = imname[:-2]
-        #print 'load mask %s' %imname
+	outimg = np.empty((2, 640, 480))
+        imname = self.maskdir + self.lines[idx].replace('.png', '_mask.png')
+        #print('load mask', imname)
         im = cv2.imread(imname)
+        #print('im', im.shape)
         im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-	im = cv2.resize(im,(572,572))
-        ret, img = cv2.threshold(im, 0.5, 1.0, cv2.THRESH_BINARY)
-	#ret, back = cv2.threshold(im, 0.5, 1.0, cv2.THRESH_BINARY_INV)
-	#outimg[0, ...] = img;
-	#outimg[1, ...] = back;
-	#outimg.astype(np.uint8)
-        return img[np.newaxis, :]
+	im = cv2.resize(im,(640, 480))
+        ret, im = cv2.threshold(im, 0.5, 1.0, cv2.THRESH_BINARY)
+        #print('load_mask', im.shape)
+        return im[np.newaxis, :]
