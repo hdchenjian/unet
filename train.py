@@ -24,4 +24,3 @@ for i in range(epochs):
             g_avg_loss.append(mean_loss)
             print('epoch: %d, iters: %d, loss: %.4f, finished: %.2f' %
                   (i+1, i*train_iter_per_epoch+j, mean_loss, 100.0*(j+1)/train_iter_per_epoch))
-        #exit()

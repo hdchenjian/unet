@@ -760,7 +760,7 @@ layer {
     decay_mult: 0
   }
   convolution_param {
-    num_output: 1
+    num_output: 2
     pad: 0
     kernel_size: 1
     weight_filler{
@@ -778,5 +778,17 @@ layer {
   top: "loss"
   include {
     phase: TRAIN
+  }
+  softmax_param {engine: CAFFE}
+}
+
+layer {
+  name: "predict"
+  type: "Softmax"
+  bottom: "score"
+  top: "predict"
+  softmax_param {engine: CAFFE}
+  include {
+    phase: TEST
   }
 }

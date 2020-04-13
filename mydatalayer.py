@@ -73,13 +73,14 @@ class DataLayer(caffe.Layer):
         return im
 
     def load_mask(self, idx):
-	outimg = np.empty((2, 640, 480))
         imname = self.maskdir + self.lines[idx].replace('.png', '_mask.png')
         #print('load mask', imname)
-        im = cv2.imread(imname)
-        #print('im', im.shape)
-        im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+        im = cv2.imread(imname, cv2.IMREAD_GRAYSCALE)
 	im = cv2.resize(im,(640, 480))
-        ret, im = cv2.threshold(im, 0.5, 1.0, cv2.THRESH_BINARY)
-        #print('load_mask', im.shape)
-        return im[np.newaxis, :]
+        im = np.array(im, np.bool)
+        labels = np.zeros((2, 480, 640), dtype=np.float32)
+        #print('sum', sum(im))
+        labels[1, ...] = im
+        labels[0, ...] = ~im
+        ret = im[np.newaxis, :]
+        return ret
