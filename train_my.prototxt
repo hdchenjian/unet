@@ -23,8 +23,24 @@ layer {
     module: 'mydatalayer'
     layer: 'DataLayer'
   }
+  include {
+      phase: TRAIN
+  }
 }
 
+layer {
+  name: "data"
+  type: "Input"
+  top: "data"
+  input_param {
+    shape: { dim: 1 dim: 3 dim: 480 dim: 640 }
+  }
+  include {
+    phase: TEST
+  }
+
+}
+        
 layer {
   name: "conv1_1"
   type: "Convolution"

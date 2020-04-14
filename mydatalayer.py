@@ -35,8 +35,6 @@ class DataLayer(caffe.Layer):
         self.mask = self.load_mask(self.idx)
         # reshape tops to fit (leading 1 is for batch dimension)
         #print('input shape', self.data.shape, self.mask.shape)
-        #top[0].reshape(1, 3, 480, 640)
-        #top[1].reshape(1, 1, 480, 640)
         top[0].reshape(1, *self.data.shape)
         top[1].reshape(1, *self.mask.shape)
 
@@ -58,29 +56,19 @@ class DataLayer(caffe.Layer):
 
     def load_image(self, idx):
         imname = self.imgdir + self.lines[idx]
-        #print('load img', imname)
         im = cv2.imread(imname)
-        #print('im', im.shape)
-        #im = cv2.imread(imname)
         im = cv2.resize(im,(640, 480))
-        #im = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
-        im = np.rollaxis(im, 2, 0)
         im = np.array(im, np.float32)
         im /= 255.0
         im -= 0.5
-        #ret = im[np.newaxis, :]
-        #print('load_image', im.shape)
+        im = im.transpose((2,0,1))
         return im
 
     def load_mask(self, idx):
         imname = self.maskdir + self.lines[idx].replace('.png', '_mask.png')
-        #print('load mask', imname)
         im = cv2.imread(imname, cv2.IMREAD_GRAYSCALE)
 	im = cv2.resize(im,(640, 480))
         im = np.array(im, np.bool)
-        labels = np.zeros((2, 480, 640), dtype=np.float32)
-        #print('sum', sum(im))
-        labels[1, ...] = im
-        labels[0, ...] = ~im
-        ret = im[np.newaxis, :]
-        return ret
+        labels = np.empty((1, 480, 640), dtype=np.float32)
+        labels[0, ...] = im
+        return labels
