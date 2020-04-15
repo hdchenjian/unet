@@ -10,7 +10,9 @@
 #include "cnrt.h"
 
 // caffe offline: 32FPS
-bool LOG_ON = true;
+// tf offline: 31.2FPS
+bool LOG_ON = false;
+int run_times = 100;
 
 double what_time_is_it_now()
 {
@@ -160,7 +162,6 @@ ClassifierLauncher::ClassifierLauncher(std::string offmodel){
 }
 
 void ClassifierLauncher::run_network(cv::Mat &image, std::vector<std::vector<float>> &detections) {
-    return;
     if (LOG_ON) {
         std::cout << "image w x h x c: " << image.cols << " x " << image.rows
                   << " x " << image.channels() << std::endl;
@@ -177,7 +178,7 @@ void ClassifierLauncher::run_network(cv::Mat &image, std::vector<std::vector<flo
         int kk = channels - 1 - k;
         for(int i = 0; i < img.rows; ++i){
             for(int j = 0; j < img.cols; ++j){
-                cpu_data_ptr[i * img.cols + j] = (img_float.at<cv::Vec3f>(i, j)[kk] - 127.5F) / 255.0F;
+                cpu_data_ptr[i * img.cols + j] = img_float.at<cv::Vec3f>(i, j)[kk] / 255.0F;
             }
         }
     }
@@ -215,52 +216,53 @@ void ClassifierLauncher::run_network(cv::Mat &image, std::vector<std::vector<flo
                               outputSizeS_[j], CNRT_MEM_TRANS_DIR_DEV2HOST));
         CNRT_CHECK(cnrtCastDataType(output_data_cast[j], CNRT_FLOAT16,
                                     outputCpu[j], CNRT_FLOAT32, out_count_, nullptr));
-        //continue;
+        continue;
         int mask_size = out_w_[j] * out_h_[j];
         int output_size = out_n_[j] * out_h_[j] * out_w_[j] * out_c_[j];
-        uchar *mask_data = (uchar *)malloc(mask_size * sizeof(char));
+        uchar *mask_data = (uchar *)malloc(mask_size * sizeof(uchar));
         for(int i = 0; i < mask_size; i++) {
             //mask_data[i] = outputCpu[j][i*2+1] * 255.0F;
-            /*
-            if(outputCpu[j][i*2+1] > 0.5F){
+            if(outputCpu[j][i] > 0.4F){
                 mask_data[i] = 255;
                 //printf("%d %f\n", i, outputCpu[j][i*2+1]);
             } else {
                 mask_data[i] = 0;
             }
-            */
         }
         cv::Mat mask(in_h_, in_w_, CV_8UC1, mask_data);
-        cv::imwrite("mask.jpg", mask);
+        cv::Mat mask_resized;
+        cv::resize(mask, mask_resized, cv::Size(image.cols, image.rows));
+        cv::imwrite("mask.jpg", mask_resized);
         free(mask_data);
     }
     return;
 }
 
-void *ssd_run(void* args) {
+void *net_run(void* args) {
     int thread_index = *((int *)args);
     std::string offmodel = "model/unet.cambricon";
-    std::string offmodel_tf = "/home/Cambricon-MLU270/tensorflow/src/tensorflow/tensorflow/cambricon_examples/tf_unet/body_condition_score/model/offline.cambricon";
+    offmodel = "/home/Cambricon-MLU270/tensorflow/src/tensorflow/tensorflow/cambricon_examples/tf_unet/body_condition_score/model/offline.cambricon";
     std::string images_file = "VISIBLE_PIC_41.jpg";
-    ClassifierLauncher* launcher = new ClassifierLauncher(offmodel_tf);
+    images_file = "pig1.jpg";
+    std::cout << "Load model: " << offmodel << ", input image: " << images_file << std::endl;
+    ClassifierLauncher* launcher = new ClassifierLauncher(offmodel);
     cv::Mat image_input = cv::imread(images_file);
 
     std::vector<std::vector<float>> detections;
     launcher->run_network(image_input, detections);
     printf("%d thread start\n", thread_index);
     double start = what_time_is_it_now();
-    int times = 1;
-    for(int i =  0; i < times; i++){
+    for(int i =  0; i < run_times; i++){
         detections.clear();
         launcher->run_network(image_input, detections);
     }
     double end = what_time_is_it_now();
-    printf("%d thread end, spend %f, %f\n", thread_index, end - start, times / (end - start));
+    printf("%d thread end, spend %f, %f FPS\n", thread_index, end - start, run_times / (end - start));
     delete launcher;
     return NULL;
 }
 
-void ssd_run_voc() {
+void net_run_voc() {
     std::vector<std::string> image_path;
     char *line = (char *)malloc(sizeof(char) * 1024);
     size_t len = 0;
@@ -306,7 +308,7 @@ void ssd_run_voc() {
         output_file.close();
     }
     double end = what_time_is_it_now();
-    printf("spend %f, %f\n", end - start, times / (end - start));
+    printf("spend %f, %f FPS\n", end - start, times / (end - start));
     delete launcher;
 }
 
@@ -323,12 +325,12 @@ int main(int argc, char* argv[]) {
     int get_time = 1;
     if(get_time == 1){
         double start = what_time_is_it_now();
-        int thread_num = 1;
+        int thread_num = 5;
         int thread_index[1024];
         std::vector<pthread_t> thread_ids(thread_num);
         for(int i = 0; i < thread_num; i++){
             thread_index[i] = i;
-            pthread_create(&thread_ids[i], NULL, ssd_run, &thread_index[i]);
+            pthread_create(&thread_ids[i], NULL, net_run, &thread_index[i]);
         }
 
         for(int i = 0; i < thread_num; i++){
@@ -336,9 +338,9 @@ int main(int argc, char* argv[]) {
         }
 
         double end = what_time_is_it_now();
-        printf("main spend %f %f", end - start, (thread_num * 500) / (end - start));
+        printf("main spend %f %f FPS", end - start, (thread_num * run_times) / (end - start));
     } else {
-        ssd_run_voc();
+        net_run_voc();
     }
     cnrtDestroy();
     return 0;
